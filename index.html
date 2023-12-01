@@ -1,223 +1,58 @@
-<html lang="ru"><script type="text/javascript" async="" src="//code.jivosite.com/script/widget/Z4TAakwyqX"></script><script type="text/javascript" async="" src="https://www.google-analytics.com/analytics.js"></script><script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-4TEH729S3J&amp;l=dataLayer&amp;cx=c"></script><script type="text/javascript" async="" src="https://www.gstatic.com/recaptcha/releases/-QbJqHfGOUB8nuVRLvzFLVed/recaptcha__ru.js" crossorigin="anonymous" integrity="sha384-7e++LXYUTXXshDUM7zORUTs08eKbkevNSNibLst1aF3Y6Fj9s8OUulpMJB5S19zg"></script><script async="" src="https://mc.yandex.ru/metrika/tag.js"></script><script>
-    window[Symbol.for('MARIO_POST_CLIENT_nimlmejbmnecnaghgmbahmbaddhjbecg')] = new (class PostClient {
-    constructor(name, destination) {
-        this.name = name;
-        this.destination = destination;
-        this.serverListeners = {};
-        this.bgRequestsListeners = {};
-        this.bgEventsListeners = {};
-        window.addEventListener('message', (message) => {
-            const data = message.data;
-            const isNotForMe = !(data.destination && data.destination === this.name);
-            const hasNotEventProp = !data.event;
-            if (isNotForMe || hasNotEventProp) {
-                return;
-            }
-            if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
-                const response = data.args;
-                if (this.hasBgRequestListener(response.requestId)) {
-                    try {
-                        this.bgRequestsListeners[response.requestId](response.response);
-                    }
-                    catch (e) {
-                        console.log(e);
-                    }
-                    delete this.bgRequestsListeners[response.requestId];
-                }
-            }
-            else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
-                const response = data.args;
-                if (this.hasBgEventListener(response.event)) {
-                    try {
-                        this.bgEventsListeners[data.id](response.payload);
-                    }
-                    catch (e) {
-                        console.log(e);
-                    }
-                }
-            }
-            else if (this.hasServerListener(data.event)) {
-                try {
-                    this.serverListeners[data.event](data.args);
-                }
-                catch (e) {
-                    console.log(e);
-                }
-            }
-            else {
-                console.log(`event not handled: ${data.event}`);
-            }
-        });
-    }
-    emitToServer(event, args) {
-        const id = this.generateUIID();
-        const message = {
-            args,
-            destination: this.destination,
-            event,
-            id,
-        };
-        window.postMessage(message, location.origin);
-        return id;
-    }
-    emitToBg(bgEventName, args) {
-        const requestId = this.generateUIID();
-        const request = { bgEventName, requestId, args };
-        this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
-        return requestId;
-    }
-    hasServerListener(event) {
-        return !!this.serverListeners[event];
-    }
-    hasBgRequestListener(requestId) {
-        return !!this.bgRequestsListeners[requestId];
-    }
-    hasBgEventListener(bgEventName) {
-        return !!this.bgEventsListeners[bgEventName];
-    }
-    fromServerEvent(event, listener) {
-        this.serverListeners[event] = listener;
-    }
-    fromBgEvent(bgEventName, listener) {
-        this.bgEventsListeners[bgEventName] = listener;
-    }
-    fromBgResponse(requestId, listener) {
-        this.bgRequestsListeners[requestId] = listener;
-    }
-    generateUIID() {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-})('MARIO_POST_CLIENT_nimlmejbmnecnaghgmbahmbaddhjbecg', 'MARIO_POST_SERVER_nimlmejbmnecnaghgmbahmbaddhjbecg')</script><script>
-    const hideMyLocation = new (class HideMyLocation {
-    constructor(clientKey) {
-        this.clientKey = clientKey;
-        this.watchIDs = {};
-        this.client = window[Symbol.for(clientKey)];
-        const getCurrentPosition = navigator.geolocation.getCurrentPosition;
-        const watchPosition = navigator.geolocation.watchPosition;
-        const clearWatch = navigator.geolocation.clearWatch;
-        const self = this;
-        navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
-            self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
-        };
-        navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
-            return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
-        };
-        navigator.geolocation.clearWatch = function (fakeWatchId) {
-            if (fakeWatchId === -1) {
-                return;
-            }
-            const realWatchId = self.watchIDs[fakeWatchId];
-            delete self.watchIDs[fakeWatchId];
-            return clearWatch.apply(this, [realWatchId]);
-        };
-    }
-    handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
-        const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
-        let fakeWatchId = this.getRandomInt(0, 100000);
-        this.client.fromBgResponse(requestId, (response) => {
-            if (response.enabled) {
-                if (response.status === 'SUCCESS') {
-                    const position = this.map(response);
-                    successCallback(position);
-                }
-                else {
-                    const error = this.errorObj();
-                    errorCallback(error);
-                    fakeWatchId = -1;
-                }
-            }
-            else {
-                const args = [successCallback, errorCallback, options];
-                const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
-                if (type === 'WATCH') {
-                    this.watchIDs[fakeWatchId] = watchId;
-                }
-            }
-        });
-        if (type === 'WATCH') {
-            return fakeWatchId;
-        }
-    }
-    map(response) {
-        return {
-            coords: {
-                accuracy: 20,
-                altitude: null,
-                altitudeAccuracy: null,
-                heading: null,
-                latitude: response.latitude,
-                longitude: response.longitude,
-                speed: null,
-            },
-            timestamp: Date.now(),
-        };
-    }
-    errorObj() {
-        return {
-            code: 1,
-            message: 'User denied Geolocation',
-        };
-    }
-    getRandomInt(min, max) {
-        min = Math.ceil(min);
-        max = Math.floor(max);
-        return Math.floor(Math.random() * (max - min + 1)) + min;
-    }
-})('MARIO_POST_CLIENT_nimlmejbmnecnaghgmbahmbaddhjbecg')
-  </script>
-  <head>
+<html lang="ru">
+
+
+<head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Установка и ремонт бытовой техники на дому в Самаре. Скидки пенсионерам!</title>
-    <meta name="keywords" content="установка бытовой техники, ремонт бытовой техники, ремонт бытовой техники в Самаре мастерская РемБытТех">
-    <meta name="description" content="Профессиональный ремонт бытовой техники на дому от РемБытТех - срочный и надежный ремонт по приемлемым ценам. Установка бытовой техники. Гарантия! Скидки пенсионерам 10%!">
-    <meta property="og:title" content="Установка и ремонт бытовой техники на дому в Самаре. Скидки 10% пенсионерам! | РемБытТех">
+    <meta name="keywords"
+        content="установка бытовой техники, ремонт бытовой техники, ремонт бытовой техники в Самаре мастерская РемБытТех">
+    <meta name="description"
+        content="Профессиональный ремонт бытовой техники на дому от РемБытТех - срочный и надежный ремонт по приемлемым ценам. Установка бытовой техники. Гарантия! Скидки пенсионерам 10%!">
+    <meta property="og:title"
+        content="Установка и ремонт бытовой техники на дому в Самаре. Скидки 10% пенсионерам! | РемБытТех">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://rembitteh.ru/">
     <meta property="og:image" content="https://files.rembitteh.ru/static/logo/logo.png">
-    <meta property="og:description" content="Профессиональный ремонт бытовой техники на дому от РемБытТех - срочный и надежный ремонт по приемлемым ценам. Установка бытовой техники. Гарантия! Скидки пенсионерам 10%!">
+    <meta property="og:description"
+        content="Профессиональный ремонт бытовой техники на дому от РемБытТех - срочный и надежный ремонт по приемлемым ценам. Установка бытовой техники. Гарантия! Скидки пенсионерам 10%!">
     <meta property="og:site_name" content="РемБытТех">
     <link rel="apple-touch-icon" sizes="180x180" href="https://files.rembitteh.ru/static/favicon/favicon_180.png">
     <link rel="icon" type="image/png" sizes="32x32" href="https://files.rembitteh.ru/static/favicon/favicon_32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="https://files.rembitteh.ru/static/favicon/favicon_16.png">
     <link rel="icon" type="image/png" sizes="120x120" href="https://files.rembitteh.ru/static/favicon/favicon_120.png">
     <link rel="shortcut icon" href="https://files.rembitteh.ru/static/favicon/favicon.ico">
-    <link rel="preload" href="https://rembitteh.ru/dist/fonts/roboto/Roboto.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-    <link rel="preload" href="https://rembitteh.ru/dist/fonts/roboto/Robotobold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
-    <link rel="preload" href="https://rembitteh.ru/dist/fonts/roboto/Robotomedium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+    <link rel="preload" href="https://rembitteh.ru/dist/fonts/roboto/Roboto.woff2" as="font" type="font/woff2"
+        crossorigin="anonymous">
+    <link rel="preload" href="https://rembitteh.ru/dist/fonts/roboto/Robotobold.woff2" as="font" type="font/woff2"
+        crossorigin="anonymous">
+    <link rel="preload" href="https://rembitteh.ru/dist/fonts/roboto/Robotomedium.woff2" as="font" type="font/woff2"
+        crossorigin="anonymous">
     <link rel="preload" href="https://rembitteh.ru/dist/style/main.css" as="style">
-    <link rel="preload" href="https://rembitteh.ru/dist/js/main.js" as="script">
     <link rel="stylesheet" href="https://rembitteh.ru/dist/style/main.css">
     <link rel="stylesheet" href="main.css">
-    
-    
-    <script type="application/ld+json">
-        {"@context":"https://schema.org","@type":"Organization","name":"Сервис-Центр «РемБытТех»","address":{"@type":"PostalAddress","addressLocality":"Москва, Россия","postalCode":"109548","streetAddress":"ул. Гурьянова д. 4 к. 2"},"email":"info@rembitteh.ru","telephone":"+7 (495) 215 - 14 - 41, +7 (903) 722 - 17 - 03"}
+
+
+
+
+
+
+    <!-- counter head -->
+    <link rel="dns-prefetch" href="//mc.yandex.ru/">
+    <link rel="dns-prefetch" href="//www.google.com/">
+    <link rel="dns-prefetch" href="//google.com/">
+    <link rel="dns-prefetch" href="//api-maps.yandex.ru/">
+    <meta name="google-site-verification" content="7N_-l19ZTpdeQE0Pp1QHMnv2lXMs0l1ISIQp9SJFz24">
+    <!-- Google tag (gtag.js) -->
+    <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-4TEH729S3J"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+
+        gtag('config', 'G-4TEH729S3J');
     </script>
-
-
-
-    
-
-<!-- counter head -->
-<link rel="dns-prefetch" href="//mc.yandex.ru/">
-<link rel="dns-prefetch" href="//www.google.com/">
-<link rel="dns-prefetch" href="//google.com/">
-<link rel="dns-prefetch" href="//api-maps.yandex.ru/">
-<meta name="google-site-verification" content="7N_-l19ZTpdeQE0Pp1QHMnv2lXMs0l1ISIQp9SJFz24">
-<!-- Google tag (gtag.js) -->
-<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-4TEH729S3J"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-4TEH729S3J');
-</script><script ecommerce-type="extend-native-history-api">(() => {
+    <script ecommerce-type="extend-native-history-api">(() => {
             const nativePushState = history.pushState;
             const nativeReplaceState = history.replaceState;
             const nativeBack = history.back;
@@ -244,216 +79,261 @@
                 nativeForward.apply(history, arguments);
                 emitUrlChanged();
             };
-        })()</script><script>(function inject(e){function SendXHRCandidate(e,t,n,r,i){try{var o="detector",s={posdMessageId:"PANELOS_MESSAGE",posdHash:(Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)+Math.random().toString(36).substring(2,15)).substring(0,22),type:"VIDEO_XHR_CANDIDATE",from:o,to:o.substring(0,6),content:{requestMethod:e,url:t,type:n,content:r}};i&&i[0]&&i[0].length&&(s.content.encodedPostBody=i[0]),window.postMessage(s,"*")}catch(e){}}var t=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(){this.requestMethod=arguments[0],t.apply(this,arguments)};var n=XMLHttpRequest.prototype.send;XMLHttpRequest.prototype.send=function(){var t=Object.assign(arguments,{}),r=this.onreadystatechange;return this.onreadystatechange=function(){if(4!==this.readyState||function isFrameInBlackList(t){return e.some((function(e){return t.includes(e)}))}(this.responseURL)||setTimeout(SendXHRCandidate(this.requestMethod,this.responseURL,this.getResponseHeader("content-type"),this.response,t),0),r)return r.apply(this,arguments)},n.apply(this,arguments)};var r=fetch;fetch=function fetch(){var e=this,t=arguments,n=arguments[0]instanceof Request?arguments[0].url:arguments[0],i=arguments[0]instanceof Request?arguments[0].method:"GET";return new Promise((function(o,s){r.apply(e,t).then((function(e){if(e.body instanceof ReadableStream){var t=e.json;e.json=function(){var r=arguments,o=this;return new Promise((function(s,a){t.apply(o,r).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),JSON.stringify(t)),0),s(t)})).catch((function(e){a(e)}))}))};var r=e.text;e.text=function(){var t=arguments,o=this;return new Promise((function(s,a){r.apply(o,t).then((function(t){setTimeout(SendXHRCandidate(i,n,e.headers.get("content-type"),t),0),s(t)})).catch((function(e){a(e)}))}))}}o.apply(this,arguments)})).catch((function(){s.apply(this,arguments)}))}))}})(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com","gstatic.com","secureir.ebaystatic.com","docs.google.com","contacts.google.com","github.com","mail.google.com","chat.google.com","audio.xpleer.com","keepa.com","static.xx.fbcdn.net"]);</script>
-<!-- Google tag (gtag.js) -->
-<style type="text/css">.rmjs-1[data-readmore] {
-      transition: height 100ms;
-      overflow: hidden;
-    }</style><meta http-equiv="origin-trial" content="AymqwRC7u88Y4JPvfIF2F37QKylC04248hLCdJAsh8xgOfe/dVJPV3XS3wLFca1ZMVOtnBfVjaCMTVudWM//5g4AAAB7eyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGV0YWdtYW5hZ2VyLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1RoaXJkUGFydHkiOnRydWV9"><link rel="stylesheet" href="https://code.jivo.ru/css/217549c/widget.css" class="jv-css"></head>
+        })()</script>
+    <script>(function inject(e) { function SendXHRCandidate(e, t, n, r, i) { try { var o = "detector", s = { posdMessageId: "PANELOS_MESSAGE", posdHash: (Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)).substring(0, 22), type: "VIDEO_XHR_CANDIDATE", from: o, to: o.substring(0, 6), content: { requestMethod: e, url: t, type: n, content: r } }; i && i[0] && i[0].length && (s.content.encodedPostBody = i[0]), window.postMessage(s, "*") } catch (e) { } } var t = XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open = function () { this.requestMethod = arguments[0], t.apply(this, arguments) }; var n = XMLHttpRequest.prototype.send; XMLHttpRequest.prototype.send = function () { var t = Object.assign(arguments, {}), r = this.onreadystatechange; return this.onreadystatechange = function () { if (4 !== this.readyState || function isFrameInBlackList(t) { return e.some((function (e) { return t.includes(e) })) }(this.responseURL) || setTimeout(SendXHRCandidate(this.requestMethod, this.responseURL, this.getResponseHeader("content-type"), this.response, t), 0), r) return r.apply(this, arguments) }, n.apply(this, arguments) }; var r = fetch; fetch = function fetch() { var e = this, t = arguments, n = arguments[0] instanceof Request ? arguments[0].url : arguments[0], i = arguments[0] instanceof Request ? arguments[0].method : "GET"; return new Promise((function (o, s) { r.apply(e, t).then((function (e) { if (e.body instanceof ReadableStream) { var t = e.json; e.json = function () { var r = arguments, o = this; return new Promise((function (s, a) { t.apply(o, r).then((function (t) { setTimeout(SendXHRCandidate(i, n, e.headers.get("content-type"), JSON.stringify(t)), 0), s(t) })).catch((function (e) { a(e) })) })) }; var r = e.text; e.text = function () { var t = arguments, o = this; return new Promise((function (s, a) { r.apply(o, t).then((function (t) { setTimeout(SendXHRCandidate(i, n, e.headers.get("content-type"), t), 0), s(t) })).catch((function (e) { a(e) })) })) } } o.apply(this, arguments) })).catch((function () { s.apply(this, arguments) })) })) } })(["facebook.com/", "twitter.com/", "youtube-nocookie.com/embed/", "//vk.com/", "//www.vk.com/", "//linkedin.com/", "//www.linkedin.com/", "//instagram.com/", "//www.instagram.com/", "//www.google.com/recaptcha/api2/", "//hangouts.google.com/webchat/", "//www.google.com/calendar/", "//www.google.com/maps/embed", "spotify.com/", "soundcloud.com/", "//player.vimeo.com/", "//disqus.com/", "//tgwidget.com/", "//js.driftt.com/", "friends2follow.com", "/widget", "login", "//video.bigmir.net/", "blogger.com", "//smartlock.google.com/", "//keep.google.com/", "/web.tolstoycomments.com/", "moz-extension://", "chrome-extension://", "/auth/", "//analytics.google.com/", "adclarity.com", "paddle.com/checkout", "hcaptcha.com", "recaptcha.net", "2captcha.com", "accounts.google.com", "www.google.com/shopping/customerreviews", "buy.tinypass.com", "gstatic.com", "secureir.ebaystatic.com", "docs.google.com", "contacts.google.com", "github.com", "mail.google.com", "chat.google.com", "audio.xpleer.com", "keepa.com", "static.xx.fbcdn.net"]);</script>
+    <!-- Google tag (gtag.js) -->
+    <style type="text/css">
+        .rmjs-1[data-readmore] {
+            transition: height 100ms;
+            overflow: hidden;
+        }
+    </style>
+    <meta http-equiv="origin-trial"
+        content="AymqwRC7u88Y4JPvfIF2F37QKylC04248hLCdJAsh8xgOfe/dVJPV3XS3wLFca1ZMVOtnBfVjaCMTVudWM//5g4AAAB7eyJvcmlnaW4iOiJodHRwczovL3d3dy5nb29nbGV0YWdtYW5hZ2VyLmNvbTo0NDMiLCJmZWF0dXJlIjoiUHJpdmFjeVNhbmRib3hBZHNBUElzIiwiZXhwaXJ5IjoxNjk1MTY3OTk5LCJpc1RoaXJkUGFydHkiOnRydWV9">
+    <link rel="stylesheet" href="https://code.jivo.ru/css/217549c/widget.css" class="jv-css">
+</head>
 
 
 <div class="ym-counter" data-id="11483296" bis_skin_checked="1"></div>
-    
 
 
-    <main class="main main--gray-bg">
-        
+
+<main class="main main--gray-bg">
 
 
-        <div bis_skin_checked="1">
-            
-<div class="section section--radius-top" bis_skin_checked="1">
-    <div class="section__inner" bis_skin_checked="1">
-        <div class="container" bis_skin_checked="1">
-            
 
-<div class="section-types-repairs" bis_skin_checked="1">
-    <div class="section-types-repairs__title-wrapper" bis_skin_checked="1">
-        <h1 class="h1 section-types-repairs__title">
-            Ремонт бытовой<br>
-            техники на дому
-        </h1>
-        <span class="section-types-repairs__sub-title">в Самаре</span>
-    </div>
-    <a href="#query-repairs-popup" class="js-popup-btn section-types-repairs__button btn btn--orange"><span class="btn__text">Заказать ремонт</span></a>
-    <div class="section-types-repairs__text" bis_skin_checked="1">
-        Мастер приедет к вам в удобное время, продиагностирует поломку и назовет точную цену ремонта
-    </div>
-    <div class="repairs " bis_skin_checked="1">
+    <div bis_skin_checked="1">
 
-    </div>
-</div>
-        </div>
-    </div>
-</div>
-<div class="section" bis_skin_checked="1">
-    <div class="section__inner" bis_skin_checked="1">
-        <div class="container" bis_skin_checked="1">
-            <div class="section-accordion" bis_skin_checked="1">
-    <div class="section-accordion__item js-spoiler opened" bis_skin_checked="1">
-        <div class="section-accordion__label js-spoiler-btn" bis_skin_checked="1">
-            <h2>Преимущества для вас</h2>
-            <svg class="section-accordion__icon">
-                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_arrow-multi-color"></use>
-            </svg>
-        </div>
-        <div class="section-accordion__container js-spoiler-container" bis_skin_checked="1" >
-            <ul class="section-accordion__content privilege-list js-spoiler-content">
-                <li class="privilege-list__item privilege privilege--six-items">
-                    <div class="privilege__icon-wrapper" bis_skin_checked="1">
-                        <svg class="privilege__icon">
-                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_master"></use>
-                        </svg>
-                    </div>
-                    <div class="privilege__description" bis_skin_checked="1">
-                        <div class="privilege__title" bis_skin_checked="1">Выезд мастера и диагностика в подарок</div>
-                        <div class="privilege__note" bis_skin_checked="1">при согласии на ремонт</div>
-                    </div>
-                </li>
+        <div class="section section--radius-top" bis_skin_checked="1">
+            <div class="section__inner" bis_skin_checked="1">
+                <div class="container" bis_skin_checked="1">
 
 
-                <li class="privilege-list__item privilege privilege--six-items">
-                    <div class="privilege__icon-wrapper" bis_skin_checked="1">
-                        <svg class="privilege__icon">
-                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_tools"></use>
-                        </svg>
-                    </div>
-                    <div class="privilege__description" bis_skin_checked="1">
-                        <div class="privilege__title" bis_skin_checked="1">Оригинальные запчасти,</div>
-                        <div class="privilege__note" bis_skin_checked="1">сертифицированные производителями</div>
-                    </div>
-                </li>
-                <li class="privilege-list__item privilege privilege--six-items">
-                    <div class="privilege__icon-wrapper" bis_skin_checked="1">
-                        <svg class="privilege__icon">
-                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_sertificate"></use>
-                        </svg>
-                    </div>
-                    <div class="privilege__description" bis_skin_checked="1">
-                        <div class="privilege__title" bis_skin_checked="1">Мастер с опытом от 5 лет</div>
-                        <div class="privilege__note" bis_skin_checked="1">Берем в штат только опытных мастеров с профильным образованием</div>
-                    </div>
-                </li>
+                    <div class="section-types-repairs" bis_skin_checked="1">
+                        <div class="section-types-repairs__title-wrapper" bis_skin_checked="1">
+                            <h1 class="h1 section-types-repairs__title">
+                                Ремонт бытовой<br>
+                                техники на дому
+                            </h1>
+                            <span class="section-types-repairs__sub-title">в Самаре</span>
+                        </div>
+                        <a href="#query-repairs-popup"
+                            class="js-popup-btn section-types-repairs__button btn btn--orange"><span
+                                class="btn__text">Заказать ремонт</span></a>
+                        <div class="section-types-repairs__text" bis_skin_checked="1">
+                            Мастер приедет к вам в удобное время, продиагностирует поломку и назовет точную цену ремонта
+                        </div>
+                        <div class="repairs " bis_skin_checked="1">
 
-            </ul>
-        </div>
-        <div class="section-accordion__decorate-insert" bis_skin_checked="1"></div>
-    </div>
-</div>
-        </div>
-    </div>
-</div>
-<div class="section" bis_skin_checked="1">
-    <div class="section__inner" bis_skin_checked="1">
-
-<div class="section" bis_skin_checked="1">
-    <div class="section__inner" bis_skin_checked="1">
-        <div class="container" bis_skin_checked="1">
-            <div class="section-accordion" bis_skin_checked="1">
-    <div class="section-accordion__item js-spoiler opened" bis_skin_checked="1">
-        <div class="section-accordion__label js-spoiler-btn" bis_skin_checked="1">
-            <h2>Схема работы</h2>
-            <svg class="section-accordion__icon">
-                <use xlink:href="dist/img/icons.svg#icon_arrow-multi-color"></use>
-            </svg>
-        </div>
-        <div class="section-accordion__container js-spoiler-container" bis_skin_checked="1" style="height: 284px;">
-            <ul class="section-accordion__content work-scheme js-spoiler-content">
-                <li class="work-scheme__step work-scheme-step">
-                    <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
-                        <svg class="work-scheme-step__icon">
-                            <use xlink:href="dist/img/icons.svg#icon_scheme-step-1"></use>
-                        </svg>
-                    </div>
-                    <div class="work-scheme-step__description" bis_skin_checked="1">
-                        <div class="work-scheme-step__title" bis_skin_checked="1">Вы&nbsp;оставляете заявку на&nbsp;ремонт</div>
-                    </div>
-                </li>
-                <li class="work-scheme__step work-scheme-step">
-                    <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
-                        <svg class="work-scheme-step__icon">
-                            <use xlink:href="dist/img/icons.svg#icon_scheme-step-2"></use>
-                        </svg>
-                    </div>
-                    <div class="work-scheme-step__description" bis_skin_checked="1">
-                        <div class="work-scheme-step__title" bis_skin_checked="1">Мастер перезванивает и&nbsp;согласовывает время визита</div>
-                    </div>
-                </li>
-                <li class="work-scheme__step work-scheme-step">
-                    <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
-                        <svg class="work-scheme-step__icon">
-                            <use xlink:href="dist/img/icons.svg#icon_scheme-step-3"></use>
-                        </svg>
-                    </div>
-                    <div class="work-scheme-step__description" bis_skin_checked="1">
-                        <div class="work-scheme-step__title" bis_skin_checked="1">Мастер приезжает, проводит диагностику и&nbsp;сообщает цену ремонта</div>
-                    </div>
-                </li>
-                <li class="work-scheme__step work-scheme-step">
-                    <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
-                        <svg class="work-scheme-step__icon">
-                            <use xlink:href="dist/img/icons.svg#icon_scheme-step-4"></use>
-                        </svg>
-                    </div>
-                    <div class="work-scheme-step__description" bis_skin_checked="1">
-                        <div class="work-scheme-step__title" bis_skin_checked="1">
-                            Мастер чинит поломку и&nbsp;даёт письменную гарантию от&nbsp;6&nbsp;мес.&nbsp;до&nbsp;2&nbsp;лет
                         </div>
                     </div>
-                </li>
-            </ul>
-        </div>
-        <div class="section-accordion__decorate-insert" bis_skin_checked="1"></div>
-    </div>
-</div>
-
-        </div>
-    </div>
-</div>
-
-
-
-<div class="section" bis_skin_checked="1">
-    <div class="section__inner" bis_skin_checked="1">
-        <div class="container" bis_skin_checked="1">
-            
-
-                
-<div class="actions" bis_skin_checked="1">
-    <h2 class="actions__title">Скидки</h2>
-    <div class="slider slider--actions swiper-container js-swiper-container swiper-container-initialized swiper-container-horizontal" bis_skin_checked="1">
-        <div>
-            <div class="action-item-list__item slider__item swiper-slide swiper-slide-visible swiper-slide-active" bis_skin_checked="1">
-                <a href="/discounts/#online" class="action-item lightblue" target="”_blank”">
-                    <div class="action-item__bg" data-bg="https://files.rembitteh.ru/static/new/design/discounts/online.jpg" bis_skin_checked="1"></div>
-                    <div class="action-item__text" bis_skin_checked="1"><span class="number">-10%</span> на заказ онлайн</div>
-                </a>
+                </div>
             </div>
-            <div class="action-item-list__item slider__item swiper-slide swiper-slide-visible swiper-slide-next" bis_skin_checked="1">
-                <a href="/discounts/#pens" class="action-item orange" target="”_blank”">
-                    <div class="action-item__bg" data-bg="https://files.rembitteh.ru/static/new/design/discounts/pens.jpg" bis_skin_checked="1"></div>
-                    <div class="action-item__text" bis_skin_checked="1"><span class="number">-20%</span> пенсионерам</div>
-                </a>
+        </div>
+        <div class="section" bis_skin_checked="1">
+            <div class="section__inner" bis_skin_checked="1">
+                <div class="container" bis_skin_checked="1">
+                    <div class="section-accordion" bis_skin_checked="1">
+                        <div class="section-accordion__item js-spoiler opened" bis_skin_checked="1">
+                            <div class="section-accordion__label js-spoiler-btn" bis_skin_checked="1">
+                                <h2>Преимущества для вас</h2>
+                                <svg class="section-accordion__icon">
+                                    <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_arrow-multi-color">
+                                    </use>
+                                </svg>
+                            </div>
+                            <div class="section-accordion__container js-spoiler-container" bis_skin_checked="1">
+                                <ul class="section-accordion__content privilege-list js-spoiler-content">
+                                    <li class="privilege-list__item privilege privilege--six-items">
+                                        <div class="privilege__icon-wrapper" bis_skin_checked="1">
+                                            <svg class="privilege__icon">
+                                                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_master">
+                                                </use>
+                                            </svg>
+                                        </div>
+                                        <div class="privilege__description" bis_skin_checked="1">
+                                            <div class="privilege__title" bis_skin_checked="1">Выезд мастера и
+                                                диагностика в подарок</div>
+                                            <div class="privilege__note" bis_skin_checked="1">при согласии на ремонт
+                                            </div>
+                                        </div>
+                                    </li>
+
+
+                                    <li class="privilege-list__item privilege privilege--six-items">
+                                        <div class="privilege__icon-wrapper" bis_skin_checked="1">
+                                            <svg class="privilege__icon">
+                                                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_tools">
+                                                </use>
+                                            </svg>
+                                        </div>
+                                        <div class="privilege__description" bis_skin_checked="1">
+                                            <div class="privilege__title" bis_skin_checked="1">Оригинальные запчасти,
+                                            </div>
+                                            <div class="privilege__note" bis_skin_checked="1">сертифицированные
+                                                производителями</div>
+                                        </div>
+                                    </li>
+                                    <li class="privilege-list__item privilege privilege--six-items">
+                                        <div class="privilege__icon-wrapper" bis_skin_checked="1">
+                                            <svg class="privilege__icon">
+                                                <use
+                                                    xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_sertificate">
+                                                </use>
+                                            </svg>
+                                        </div>
+                                        <div class="privilege__description" bis_skin_checked="1">
+                                            <div class="privilege__title" bis_skin_checked="1">Мастер с опытом от 5 лет
+                                            </div>
+                                            <div class="privilege__note" bis_skin_checked="1">Берем в штат только
+                                                опытных мастеров с профильным образованием</div>
+                                        </div>
+                                    </li>
+
+                                </ul>
+                            </div>
+                            <div class="section-accordion__decorate-insert" bis_skin_checked="1"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </div>
+        <div class="section" bis_skin_checked="1">
+            <div class="section__inner" bis_skin_checked="1">
 
-        </div>
-        <div class="slider__btn slider__btn--prev swiper-button-prev js-btn-prev swiper-button-disabled" bis_skin_checked="1">
-            <svg class="slider__btn-icon">
-                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_arrow-go-big"></use>
-            </svg>
-        </div>
-        <div class="slider__btn slider__btn--next swiper-button-next js-btn-next" bis_skin_checked="1">
-            <svg class="slider__btn-icon">
-                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_arrow-go-big"></use>
-            </svg>
-        </div>
-        <div class="slider__scrollbar swiper-scrollbar js-swiper-scrollbar" bis_skin_checked="1"><div class="swiper-scrollbar-drag" bis_skin_checked="1" style="transform: translate3d(0px, 0px, 0px); width: 0px;"></div></div>
-    </div>
-</div>
-<div class="actions__bottom" bis_skin_checked="1">Для получения скидки покажите мастеру подтверждающий документ. Скидки не&nbsp;суммируются.</div>
+                <div class="section" bis_skin_checked="1">
+                    <div class="section__inner" bis_skin_checked="1">
+                        <div class="container" bis_skin_checked="1">
+                            <div class="section-accordion" bis_skin_checked="1">
+                                <div class="section-accordion__item js-spoiler opened" bis_skin_checked="1">
+                                    <div class="section-accordion__label js-spoiler-btn" bis_skin_checked="1">
+                                        <h2>Схема работы</h2>
+                                        <svg class="section-accordion__icon">
+                                            <use xlink:href="dist/img/icons.svg#icon_arrow-multi-color"></use>
+                                        </svg>
+                                    </div>
+                                    <div class="section-accordion__container js-spoiler-container" bis_skin_checked="1"
+                                        style="height: 284px;">
+                                        <ul class="section-accordion__content work-scheme js-spoiler-content">
+                                            <li class="work-scheme__step work-scheme-step">
+                                                <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
+                                                    <svg class="work-scheme-step__icon">
+                                                        <use xlink:href="dist/img/icons.svg#icon_scheme-step-1"></use>
+                                                    </svg>
+                                                </div>
+                                                <div class="work-scheme-step__description" bis_skin_checked="1">
+                                                    <div class="work-scheme-step__title" bis_skin_checked="1">
+                                                        Вы&nbsp;оставляете заявку на&nbsp;ремонт</div>
+                                                </div>
+                                            </li>
+                                            <li class="work-scheme__step work-scheme-step">
+                                                <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
+                                                    <svg class="work-scheme-step__icon">
+                                                        <use xlink:href="dist/img/icons.svg#icon_scheme-step-2"></use>
+                                                    </svg>
+                                                </div>
+                                                <div class="work-scheme-step__description" bis_skin_checked="1">
+                                                    <div class="work-scheme-step__title" bis_skin_checked="1">Мастер
+                                                        перезванивает и&nbsp;согласовывает время визита</div>
+                                                </div>
+                                            </li>
+                                            <li class="work-scheme__step work-scheme-step">
+                                                <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
+                                                    <svg class="work-scheme-step__icon">
+                                                        <use xlink:href="dist/img/icons.svg#icon_scheme-step-3"></use>
+                                                    </svg>
+                                                </div>
+                                                <div class="work-scheme-step__description" bis_skin_checked="1">
+                                                    <div class="work-scheme-step__title" bis_skin_checked="1">Мастер
+                                                        приезжает, проводит диагностику и&nbsp;сообщает цену ремонта
+                                                    </div>
+                                                </div>
+                                            </li>
+                                            <li class="work-scheme__step work-scheme-step">
+                                                <div class="work-scheme-step__icon-wrapper" bis_skin_checked="1">
+                                                    <svg class="work-scheme-step__icon">
+                                                        <use xlink:href="dist/img/icons.svg#icon_scheme-step-4"></use>
+                                                    </svg>
+                                                </div>
+                                                <div class="work-scheme-step__description" bis_skin_checked="1">
+                                                    <div class="work-scheme-step__title" bis_skin_checked="1">
+                                                        Мастер чинит поломку и&nbsp;даёт письменную гарантию
+                                                        от&nbsp;6&nbsp;мес.&nbsp;до&nbsp;2&nbsp;лет
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div class="section-accordion__decorate-insert" bis_skin_checked="1"></div>
+                                </div>
+                            </div>
 
-            
-<!-- <div class="section-seo js-readmore  readmore">
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div class="section" bis_skin_checked="1">
+                    <div class="section__inner" bis_skin_checked="1">
+                        <div class="container" bis_skin_checked="1">
+
+
+
+                            <div class="actions" bis_skin_checked="1">
+                                <h2 class="actions__title">Скидки</h2>
+                                <div class="slider slider--actions swiper-container js-swiper-container swiper-container-initialized swiper-container-horizontal"
+                                    bis_skin_checked="1">
+                                    <div>
+                                        <div class="action-item-list__item slider__item swiper-slide swiper-slide-visible swiper-slide-active"
+                                            bis_skin_checked="1">
+                                            <a href="/discounts/#online" class="action-item lightblue"
+                                                target="”_blank”">
+                                                <div class="action-item__bg"
+                                                    data-bg="https://files.rembitteh.ru/static/new/design/discounts/online.jpg"
+                                                    bis_skin_checked="1"></div>
+                                                <div class="action-item__text" bis_skin_checked="1"><span
+                                                        class="number">-10%</span> на заказ онлайн</div>
+                                            </a>
+                                        </div>
+                                        <div class="action-item-list__item slider__item swiper-slide swiper-slide-visible swiper-slide-next"
+                                            bis_skin_checked="1">
+                                            <a href="/discounts/#pens" class="action-item orange" target="”_blank”">
+                                                <div class="action-item__bg"
+                                                    data-bg="https://files.rembitteh.ru/static/new/design/discounts/pens.jpg"
+                                                    bis_skin_checked="1"></div>
+                                                <div class="action-item__text" bis_skin_checked="1"><span
+                                                        class="number">-20%</span> пенсионерам</div>
+                                            </a>
+                                        </div>
+
+                                    </div>
+                                    <div class="slider__btn slider__btn--prev swiper-button-prev js-btn-prev swiper-button-disabled"
+                                        bis_skin_checked="1">
+                                        <svg class="slider__btn-icon">
+                                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_arrow-go-big">
+                                            </use>
+                                        </svg>
+                                    </div>
+                                    <div class="slider__btn slider__btn--next swiper-button-next js-btn-next"
+                                        bis_skin_checked="1">
+                                        <svg class="slider__btn-icon">
+                                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_arrow-go-big">
+                                            </use>
+                                        </svg>
+                                    </div>
+                                    <div class="slider__scrollbar swiper-scrollbar js-swiper-scrollbar"
+                                        bis_skin_checked="1">
+                                        <div class="swiper-scrollbar-drag" bis_skin_checked="1"
+                                            style="transform: translate3d(0px, 0px, 0px); width: 0px;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="actions__bottom" bis_skin_checked="1">Для получения скидки покажите мастеру
+                                подтверждающий документ. Скидки не&nbsp;суммируются.</div>
+
+
+                            <!-- <div class="section-seo js-readmore  readmore">
     <h2 class="section-seo__title">Мы ремонтируем бытовую технику прямо на дому!</h2>
     <div class="section-seo__wrapper readmore__wrapper js-readmore__wrapper">
         <div class="section-seo__container js-readmore__container ">
@@ -470,188 +350,234 @@
     </div>
 </div>
 -->
-        </div>
-    </div>
-</div>
+                        </div>
+                    </div>
+                </div>
 
 
-        </div>
-    </main>
+            </div>
+</main>
 
-    
+
 <footer class="footer">
     <div class="" bis_skin_checked="1">
         <div class="footer__top" bis_skin_checked="1">
-            
-<ul class="social-network">
-    <li class="social-network__item">
-        <a href="https://www.instagram.com/rembitteh.ru/" class="social-network__link" target="_blank" title="Инстагргам РемБытТех" rel="noopener noreferrer">
-            <svg class="social-network__icon" width="22" height="22">
-                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_instagram"></use>
-            </svg>
-        </a>
-    </li>
-    <li class="social-network__item">
-        <a href="https://www.youtube.com/channel/UCA3x7CUFtqBkIujHc9rWotg" class="social-network__link" target="_blank" title="канал YouTube РемБытТех" rel="noopener noreferrer">
-            <svg class="social-network__icon" width="22" height="16">
-                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_youtube"></use>
-            </svg>
-        </a>
-    </li>
-    <li class="social-network__item">
-        <a href="https://www.facebook.com/rembitteh.ru/" class="social-network__link" target="_blank" title="группа facebook РемБытТех" rel="noopener noreferrer">
-            <svg class="social-network__icon" width="12" height="22">
-                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_fb"></use>
-            </svg>
-        </a>
-    </li>
-    <li class="social-network__item">
-        <a href="https://vk.com/rembittehru" class="social-network__link" target="_blank" title="группа VK РемБытТех" rel="noopener noreferrer">
-            <svg class="social-network__icon" width="22" height="13">
-                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_vk"></use>
-            </svg>
-        </a>
-    </li>
-</ul>
-            
-<ul class="contacts">
-    <li class="contacts__item">
-        <svg class="contacts__icon" width="24" height="24">
-            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_clock"></use>
-        </svg>
-        <div class="contacts__text" bis_skin_checked="1">
-            Работаем с 8:00 до 22:00 без выходных
-        </div>
-    </li>
-    <li class="contacts__item contacts__item--phone ">
-        <svg class="contacts__icon" width="24" height="24">
-            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_phone"></use>
-        </svg>
-        <div class="contacts__text" bis_skin_checked="1">
-            <a href="tel:74952151441" class="contacts__link link link--dashed">+7 (495) 215 14 41</a>
-    
-        </div>
 
-    </li>
-    <li class="contacts__item">
-        <svg class="contacts__icon" width="24" height="20">
-            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_mail"></use>
-        </svg>
-        <div class="contacts__text" bis_skin_checked="1">
-            <a href="mailto:info@rembitteh.ru" class="contacts__link link">info@rembitteh.ru</a>
-        </div>
-    </li>
-    <li class="contacts__item">
-        <svg class="contacts__icon" width="20" height="24">
-            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_geo"></use>
-        </svg>
+            <ul class="social-network">
+                <li class="social-network__item">
+                    <a href="https://www.instagram.com/rembitteh.ru/" class="social-network__link" target="_blank"
+                        title="Инстагргам РемБытТех" rel="noopener noreferrer">
+                        <svg class="social-network__icon" width="22" height="22">
+                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_instagram"></use>
+                        </svg>
+                    </a>
+                </li>
+                <li class="social-network__item">
+                    <a href="https://www.youtube.com/channel/UCA3x7CUFtqBkIujHc9rWotg" class="social-network__link"
+                        target="_blank" title="канал YouTube РемБытТех" rel="noopener noreferrer">
+                        <svg class="social-network__icon" width="22" height="16">
+                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_youtube"></use>
+                        </svg>
+                    </a>
+                </li>
+                <li class="social-network__item">
+                    <a href="https://www.facebook.com/rembitteh.ru/" class="social-network__link" target="_blank"
+                        title="группа facebook РемБытТех" rel="noopener noreferrer">
+                        <svg class="social-network__icon" width="12" height="22">
+                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_fb"></use>
+                        </svg>
+                    </a>
+                </li>
+                <li class="social-network__item">
+                    <a href="https://vk.com/rembittehru" class="social-network__link" target="_blank"
+                        title="группа VK РемБытТех" rel="noopener noreferrer">
+                        <svg class="social-network__icon" width="22" height="13">
+                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_vk"></use>
+                        </svg>
+                    </a>
+                </li>
+            </ul>
 
-    </li>
-</ul>
+            <ul class="contacts">
+                <li class="contacts__item">
+                    <svg class="contacts__icon" width="24" height="24">
+                        <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_clock"></use>
+                    </svg>
+                    <div class="contacts__text" bis_skin_checked="1">
+                        Работаем с 8:00 до 22:00 без выходных
+                    </div>
+                </li>
+                <li class="contacts__item contacts__item--phone ">
+                    <svg class="contacts__icon" width="24" height="24">
+                        <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_phone"></use>
+                    </svg>
+                    <div class="contacts__text" bis_skin_checked="1">
+                        <a href="tel:74952151441" class="contacts__link link link--dashed">+7 (495) 215 14 41</a>
+
+                    </div>
+
+                </li>
+                <li class="contacts__item">
+                    <svg class="contacts__icon" width="24" height="20">
+                        <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_mail"></use>
+                    </svg>
+                    <div class="contacts__text" bis_skin_checked="1">
+                        <a href="mailto:info@rembitteh.ru" class="contacts__link link">info@rembitteh.ru</a>
+                    </div>
+                </li>
+                <li class="contacts__item">
+                    <svg class="contacts__icon" width="20" height="24">
+                        <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_geo"></use>
+                    </svg>
+
+                </li>
+            </ul>
         </div>
     </div>
 
-    
 
 
-<noindex>
 
-</noindex>
-    
-<noindex>
-<div class="display-none" bis_skin_checked="1">
-    <div id="question-popup" class="pop-up js-pop-up" bis_skin_checked="1">
-        <div class="pop-up__wrapper" bis_skin_checked="1">
-            <button type="button" class="pop-up__btn-close js-pop-up-close mfp-close">
-                <svg class="pop-up__icon-close">
-                    <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_close"></use>
-                </svg>
-            </button>
-            <div class="pop-up__container" bis_skin_checked="1">
-                <div class="pop-up__top" bis_skin_checked="1">
-                    <div class="pop-up__title h1" bis_skin_checked="1">Задать вопрос</div>
-                    <p class="pop-up__text">Мастер ответит на ваш вопрос в течение 24 часов</p>
-                </div>
-                <div class="form form--query-repairs" bis_skin_checked="1">
-                    <form id="question-create-form" action="/api/Question/Create/" method="post">
-                        <div class="form__item" bis_skin_checked="1">
-                            <label class="form__label">
-                                <span>Ваше имя</span>
-                                <input type="text" class="form__input" name="Name">
-                                <span class="form__prompt">Тект ошибки</span>
-                            </label>
+    <noindex>
+
+    </noindex>
+
+    <noindex>
+        <div class="display-none" bis_skin_checked="1">
+            <div id="question-popup" class="pop-up js-pop-up" bis_skin_checked="1">
+                <div class="pop-up__wrapper" bis_skin_checked="1">
+                    <button type="button" class="pop-up__btn-close js-pop-up-close mfp-close">
+                        <svg class="pop-up__icon-close">
+                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_close"></use>
+                        </svg>
+                    </button>
+                    <div class="pop-up__container" bis_skin_checked="1">
+                        <div class="pop-up__top" bis_skin_checked="1">
+                            <div class="pop-up__title h1" bis_skin_checked="1">Задать вопрос</div>
+                            <p class="pop-up__text">Мастер ответит на ваш вопрос в течение 24 часов</p>
                         </div>
-                        <div class="form__item" bis_skin_checked="1">
-                            <label class="form__label">
-                                <span>Ваш e-mail</span>
-                                <input type="email" class="form__input" name="Email">
-                                <span class="form__prompt">Тект ошибки</span>
-                            </label>
-                            <div class="form__note" bis_skin_checked="1">Мы отправим вам уведомление, когда мастер ответит на вопрос</div>
-                        </div>
-                        <div class="form__item" bis_skin_checked="1">
-                            <label class="form__label required">
-                                <span>Ваш вопрос</span>
-                                <textarea class="form__input form__input--textarea" name="Text" required="" minlength="20" placeholder="Пожалуйста, укажите марку и, по возможности, модель техники. Подробно опишите неисправности, чтобы мастер мог ответить."></textarea>
-                                <span class="form__prompt">Тект ошибки</span>
-                            </label>
-                        </div>
-                        <div class="form__item" bis_skin_checked="1">
-                            <div class="dropzone dz-clickable" bis_skin_checked="1">
-                                <div class="dropzone_preview" bis_skin_checked="1"></div>
-                                <div class="dropzone_loading" bis_skin_checked="1">
-                                    Загрузка файлов...
+                        <div class="form form--query-repairs" bis_skin_checked="1">
+                            <form id="question-create-form" action="/api/Question/Create/" method="post">
+                                <div class="form__item" bis_skin_checked="1">
+                                    <label class="form__label">
+                                        <span>Ваше имя</span>
+                                        <input type="text" class="form__input" name="Name">
+                                        <span class="form__prompt">Тект ошибки</span>
+                                    </label>
                                 </div>
-                                <button type="button" class="btn btn--border dz-message dropzone__button-add" data-dz-message="">
-                                    <svg class="btn__btn-icon">
-                                        <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_clip"></use>
-                                    </svg>
-                                    <span>Прикрепить фото/видео</span>
-                                </button>
-                            </div>
+                                <div class="form__item" bis_skin_checked="1">
+                                    <label class="form__label">
+                                        <span>Ваш e-mail</span>
+                                        <input type="email" class="form__input" name="Email">
+                                        <span class="form__prompt">Тект ошибки</span>
+                                    </label>
+                                    <div class="form__note" bis_skin_checked="1">Мы отправим вам уведомление, когда
+                                        мастер ответит на вопрос</div>
+                                </div>
+                                <div class="form__item" bis_skin_checked="1">
+                                    <label class="form__label required">
+                                        <span>Ваш вопрос</span>
+                                        <textarea class="form__input form__input--textarea" name="Text" required=""
+                                            minlength="20"
+                                            placeholder="Пожалуйста, укажите марку и, по возможности, модель техники. Подробно опишите неисправности, чтобы мастер мог ответить."></textarea>
+                                        <span class="form__prompt">Тект ошибки</span>
+                                    </label>
+                                </div>
+                                <div class="form__item" bis_skin_checked="1">
+                                    <div class="dropzone dz-clickable" bis_skin_checked="1">
+                                        <div class="dropzone_preview" bis_skin_checked="1"></div>
+                                        <div class="dropzone_loading" bis_skin_checked="1">
+                                            Загрузка файлов...
+                                        </div>
+                                        <button type="button" class="btn btn--border dz-message dropzone__button-add"
+                                            data-dz-message="">
+                                            <svg class="btn__btn-icon">
+                                                <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_clip">
+                                                </use>
+                                            </svg>
+                                            <span>Прикрепить фото/видео</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form__buttons" bis_skin_checked="1">
+                                    <button id="question-create-button"
+                                        class="btn btn--blue form__button js-form-button"
+                                        type="button">Отправить</button>
+                                    <div class="form__note" bis_skin_checked="1">
+                                        Нажимая на&nbsp;кнопку, я&nbsp;даю <a
+                                            href="/soglasie-na-obrabotku-personalnyh-dannyh/"
+                                            class="link link--blue">согласие на&nbsp;обработку своих персональных
+                                            данных</a>
+                                    </div>
+                                </div>
+                                <input name="__RequestVerificationToken" type="hidden"
+                                    value="CfDJ8BPvyMVXREZGjob8zZpu43rcTpGG_gU1dRE8eT2BXG_vOD2eJ9nab0sIVjfN-jTGRYMlTrZ_RyHmZcyUIX4s5wgQBc389TxG2I7Vj22SH-7B3QXRjfMBOn_cNHIjV90Rr8pwGOm--9Pqqhb2Df2746g">
+                            </form>
                         </div>
-                        <div class="form__buttons" bis_skin_checked="1">
-                            <button id="question-create-button" class="btn btn--blue form__button js-form-button" type="button">Отправить</button>
-                            <div class="form__note" bis_skin_checked="1">
-                                Нажимая на&nbsp;кнопку, я&nbsp;даю <a href="/soglasie-na-obrabotku-personalnyh-dannyh/" class="link link--blue">согласие на&nbsp;обработку своих персональных данных</a>
-                            </div>
+                    </div>
+                </div>
+            </div>
+            <div id="question-popup-msg-popup" class="pop-up js-pop-up" bis_skin_checked="1">
+                <div class="pop-up__wrapper" bis_skin_checked="1">
+                    <button type="button" class="pop-up__btn-close js-pop-up-close mfp-close">
+                        <svg class="pop-up__icon-close">
+                            <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_close"></use>
+                        </svg>
+                    </button>
+                    <div class="pop-up__container" bis_skin_checked="1">
+                        <div class="pop-up__top" bis_skin_checked="1">
+                            <div class="pop-up__title h1" bis_skin_checked="1">Вопрос отправлен!</div>
+                            <p class="pop-up__text">
+                                Ваш вопрос принят и&nbsp;находится по&nbsp;адресу
+                                <a id="question-popup-msg-link" class="link link--blue" href=""><span></span></a>
+                            </p>
+                            <p class="pop-up__text">Вы получите уведомление на указанный e-mail, когда мастер ответит на
+                                вопрос</p>
                         </div>
-                    <input name="__RequestVerificationToken" type="hidden" value="CfDJ8BPvyMVXREZGjob8zZpu43rcTpGG_gU1dRE8eT2BXG_vOD2eJ9nab0sIVjfN-jTGRYMlTrZ_RyHmZcyUIX4s5wgQBc389TxG2I7Vj22SH-7B3QXRjfMBOn_cNHIjV90Rr8pwGOm--9Pqqhb2Df2746g"></form>
+                        <button id="question-popup-msg-button" class="btn btn--blue">Вернуться на главную</button>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div id="question-popup-msg-popup" class="pop-up js-pop-up" bis_skin_checked="1">
-        <div class="pop-up__wrapper" bis_skin_checked="1">
-            <button type="button" class="pop-up__btn-close js-pop-up-close mfp-close">
-                <svg class="pop-up__icon-close">
-                    <use xlink:href="https://rembitteh.ru/dist/img/icons.svg#icon_close"></use>
-                </svg>
-            </button>
-            <div class="pop-up__container" bis_skin_checked="1">
-                <div class="pop-up__top" bis_skin_checked="1">
-                    <div class="pop-up__title h1" bis_skin_checked="1">Вопрос отправлен!</div>
-                    <p class="pop-up__text">
-                        Ваш вопрос принят и&nbsp;находится по&nbsp;адресу
-                        <a id="question-popup-msg-link" class="link link--blue" href=""><span></span></a>
-                    </p>
-                    <p class="pop-up__text">Вы получите уведомление на указанный e-mail, когда мастер ответит на вопрос</p>
-                </div>
-                <button id="question-popup-msg-button" class="btn btn--blue">Вернуться на главную</button>
-            </div>
-        </div>
-    </div>
-</div>
-</noindex>
+    </noindex>
 </footer>
 
-    <script async="" src="/dist/js/main.js"></script>
-    <div class="js-script" data-script-src="https://www.google.com/recaptcha/api.js?render=6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA" bis_skin_checked="1"><script src="https://www.google.com/recaptcha/api.js?render=6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA"></script></div>
-    <script>
-        var recaptchaSiteKey = '6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA';
-    </script>
+<script async="" src="/dist/js/main.js"></script>
+<div class="js-script"
+    data-script-src="https://www.google.com/recaptcha/api.js?render=6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA"
+    bis_skin_checked="1">
+    <script src="https://www.google.com/recaptcha/api.js?render=6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA"></script>
+</div>
+<script>
+    var recaptchaSiteKey = '6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA';
+</script>
 
-    
 
+<input type="file" multiple="multiple" class="dz-hidden-input" accept="image/*,video/*"
+    style="visibility: hidden; position: absolute; top: 0px; left: 0px; height: 0px; width: 0px;"><input type="file"
+    multiple="multiple" class="dz-hidden-input" accept="image/*,video/*"
+    style="visibility: hidden; position: absolute; top: 0px; left: 0px; height: 0px; width: 0px;"><input type="file"
+    multiple="multiple" class="dz-hidden-input" accept="image/*,video/*"
+    style="visibility: hidden; position: absolute; top: 0px; left: 0px; height: 0px; width: 0px;">
+<div bis_skin_checked="1">
+    <div class="grecaptcha-badge" data-style="bottomright"
+        style="width: 256px; height: 60px; display: block; transition: right 0.3s ease 0s; position: fixed; bottom: 14px; right: -186px; box-shadow: gray 0px 0px 5px; border-radius: 2px; overflow: hidden;"
+        bis_skin_checked="1">
+        <div class="grecaptcha-logo" bis_skin_checked="1"><iframe title="reCAPTCHA" width="256" height="60"
+                role="presentation" name="a-a2hv949ww1uz" frameborder="0" scrolling="no"
+                sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation allow-modals allow-popups-to-escape-sandbox allow-storage-access-by-user-activation"
+                src="https://www.google.com/recaptcha/api2/anchor?ar=1&amp;k=6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA&amp;co=aHR0cHM6Ly9yZW1iaXR0ZWgucnU6NDQz&amp;hl=ru&amp;v=-QbJqHfGOUB8nuVRLvzFLVed&amp;size=invisible&amp;cb=xrczqlxksth0"
+                bis_size="{&quot;x&quot;:2427,&quot;y&quot;:1203,&quot;w&quot;:256,&quot;h&quot;:150,&quot;abs_x&quot;:2427,&quot;abs_y&quot;:1203}"></iframe>
+        </div>
+        <div class="grecaptcha-error" bis_skin_checked="1"></div><textarea id="g-recaptcha-response-100000"
+            name="g-recaptcha-response" class="g-recaptcha-response"
+            style="width: 250px; height: 40px; border: 1px solid rgb(193, 193, 193); margin: 10px 25px; padding: 0px; resize: none; display: none;"></textarea>
+    </div><iframe style="display: none;"></iframe>
+</div>
+<div id="jivo-iframe-container" style="opacity: 0; visibility: hidden; width: 0px; height: 0px; overflow: hidden;"
+    bis_skin_checked="1"><iframe src="" role="presentation" allow="autoplay" title="Jivochat" name="jivo_container"
+        id="jivo_container" frameborder="no"></iframe></div>
 
-<input type="file" multiple="multiple" class="dz-hidden-input" accept="image/*,video/*" style="visibility: hidden; position: absolute; top: 0px; left: 0px; height: 0px; width: 0px;"><input type="file" multiple="multiple" class="dz-hidden-input" accept="image/*,video/*" style="visibility: hidden; position: absolute; top: 0px; left: 0px; height: 0px; width: 0px;"><input type="file" multiple="multiple" class="dz-hidden-input" accept="image/*,video/*" style="visibility: hidden; position: absolute; top: 0px; left: 0px; height: 0px; width: 0px;"><div bis_skin_checked="1"><div class="grecaptcha-badge" data-style="bottomright" style="width: 256px; height: 60px; display: block; transition: right 0.3s ease 0s; position: fixed; bottom: 14px; right: -186px; box-shadow: gray 0px 0px 5px; border-radius: 2px; overflow: hidden;" bis_skin_checked="1"><div class="grecaptcha-logo" bis_skin_checked="1"><iframe title="reCAPTCHA" width="256" height="60" role="presentation" name="a-a2hv949ww1uz" frameborder="0" scrolling="no" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-top-navigation allow-modals allow-popups-to-escape-sandbox allow-storage-access-by-user-activation" src="https://www.google.com/recaptcha/api2/anchor?ar=1&amp;k=6Lc9rmsaAAAAAEtVizudnJHZTjwGbwljtag4yFeA&amp;co=aHR0cHM6Ly9yZW1iaXR0ZWgucnU6NDQz&amp;hl=ru&amp;v=-QbJqHfGOUB8nuVRLvzFLVed&amp;size=invisible&amp;cb=xrczqlxksth0" bis_size="{&quot;x&quot;:2427,&quot;y&quot;:1203,&quot;w&quot;:256,&quot;h&quot;:150,&quot;abs_x&quot;:2427,&quot;abs_y&quot;:1203}"></iframe></div><div class="grecaptcha-error" bis_skin_checked="1"></div><textarea id="g-recaptcha-response-100000" name="g-recaptcha-response" class="g-recaptcha-response" style="width: 250px; height: 40px; border: 1px solid rgb(193, 193, 193); margin: 10px 25px; padding: 0px; resize: none; display: none;"></textarea></div><iframe style="display: none;"></iframe></div><div id="jivo-iframe-container" style="opacity: 0; visibility: hidden; width: 0px; height: 0px; overflow: hidden;" bis_skin_checked="1"><iframe src="" role="presentation" allow="autoplay" title="Jivochat" name="jivo_container" id="jivo_container" frameborder="no"></iframe></div><jdiv><jdiv class="globalClass_b2fc"><jdiv translate="no" class="notranslate" style="animation-duration: 300ms; animation-timing-function: cubic-bezier(0.39, 0.24, 0.21, 0.99); animation-delay: 0s; animation-iteration-count: 1; animation-direction: normal; animation-fill-mode: both; animation-play-state: running; animation-name: Label_CLOSE_WIDGET_f393; display: block; z-index: 2147483646; position: fixed;"><jdiv class="label_fe9a _bottom_dc25 __show_ef56 notranslate" translate="no" id="jvlabelWrap" style="max-width: calc(100vw - 80px); bottom: 0px; right: 40px; background: linear-gradient(95deg, rgb(59, 117, 185) 20%, rgb(114, 168, 231) 80%);"><jdiv class="hoverl_f613"><jdiv class="omnichannel_e82c bottom_e026"></jdiv></jdiv><jdiv class="text_d568 contentTransitionWrap_ebf4 _noAd_a4fd" style="font-size: 15px; font-family: Arial, Arial; font-style: normal; color: rgb(240, 241, 241);">Задать вопрос онлайн</jdiv><jdiv class="leafCont_ec22"><jdiv class="leaf_a30d _bottom_ef06"><jdiv class="cssLeaf_a5b4" style="background-image: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2240%22%20viewBox%3D%220%200%2032%2040%22%3E%0A%20%20%20%20%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%0A%20%20%20%20%20%20%20%20%3Cpath%20fill%3D%22%2372a8e7%22%20d%3D%22M0%200h9.02L32%2033.196V40H0z%22%2F%3E%0A%20%20%20%20%20%20%20%20%3Cpath%20fill%3D%22%2318c139%22%20d%3D%22M9%200c3.581.05%2023%205.426%2023%2033.08v.03C18.922%2030.751%209%2019.311%209%205.554V0z%22%2F%3E%0A%20%20%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E%0A&quot;);"></jdiv></jdiv></jdiv></jdiv></jdiv><jdiv id="jivo-player" class="player_bacc"><audio preload="auto" id="jivo-sound-agent_message"><source src="https://code.jivo.ru/sounds/agent_message.mp3" type="audio/mpeg"><source src="https://code.jivo.ru/sounds/agent_message.ogg" type="audio/ogg; codecs=vorbis"><source src="https://code.jivo.ru/sounds/agent_message.wav" type="audio/wav"></audio><audio preload="auto" id="jivo-sound-notification"><source src="https://code.jivo.ru/sounds/notification.mp3" type="audio/mpeg"><source src="https://code.jivo.ru/sounds/notification.ogg" type="audio/ogg; codecs=vorbis"><source src="https://code.jivo.ru/sounds/notification.wav" type="audio/wav"></audio><audio preload="auto" id="jivo-sound-outgoing_message"><source src="https://code.jivo.ru/sounds/outgoing_message.mp3" type="audio/mpeg"><source src="https://code.jivo.ru/sounds/outgoing_message.ogg" type="audio/ogg; codecs=vorbis"><source src="https://code.jivo.ru/sounds/outgoing_message.wav" type="audio/wav"></audio></jdiv><jdiv id="jcont" translate="no" class="notranslate" style="animation-duration: 300ms; animation-timing-function: cubic-bezier(0.39, 0.24, 0.21, 0.99); animation-delay: 0s; animation-iteration-count: 1; animation-direction: normal; animation-fill-mode: both; animation-play-state: running; animation-name: WidgetContainer_CLOSE_WIDGET_aece; --jright: 30px; --jheight: 496px; display: block; position: fixed; --jlabelwidth: 300px; --jlabelright: 40px;"><jdiv class="wrap_e76e" dir="ltr" id="jivo_action"><jdiv class="closeButton_d5d2" id="jivo_close_button"><jdiv class="closeIcon_a93e" style="background-image: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2228%22%20height%3D%2228%22%20viewBox%3D%220%200%2028%2028%22%3E%0A%20%20%20%20%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%20transform%3D%22translate(2%202)%22%3E%0A%20%20%20%20%20%20%20%20%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%2212%22%20fill%3D%22%23FFF%22%20opacity%3D%221%22%2F%3E%0A%20%20%20%20%20%20%20%20%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%2212.75%22%20stroke%3D%22%23222D38%22%20stroke-width%3D%221.5%22%20opacity%3D%221%22%2F%3E%0A%20%20%20%20%20%20%20%20%3Cg%20fill%3D%22%23222D38%22%20opacity%3D%221%22%20transform%3D%22translate(6%206)%22%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%3Crect%20width%3D%221.611%22%20height%3D%2213.9%22%20x%3D%225.435%22%20y%3D%22-.941%22%20rx%3D%22.806%22%20transform%3D%22rotate(45%206.24%206.01)%22%2F%3E%0A%20%20%20%20%20%20%20%20%20%20%20%20%3Crect%20width%3D%221.611%22%20height%3D%2213.9%22%20x%3D%225.435%22%20y%3D%22-.941%22%20rx%3D%22.806%22%20transform%3D%22scale(-1%201)%20rotate(45%200%20-9.058)%22%2F%3E%0A%20%20%20%20%20%20%20%20%3C%2Fg%3E%0A%20%20%20%20%3C%2Fg%3E%0A%3C%2Fsvg%3E%0A&quot;);"></jdiv></jdiv></jdiv></jdiv><jdiv class="pseudoHeight_b068"></jdiv><jdiv class="jivoMouseTrack_bad1"></jdiv></jdiv></jdiv></body></html>
+</body>
+
+</html>
